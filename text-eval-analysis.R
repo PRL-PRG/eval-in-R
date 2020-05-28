@@ -166,7 +166,7 @@ ev_results <- if(length(eval_results) > 0)
 
 # Packages using eval
 packagesPlot <- ev_results %>% count(package) %>% arrange(desc(n)) %>% ggplot() + geom_col(aes(x=fct_reorder(package, n), y=n))  + 
-  labs(y="number", x="package", title = "packahes using eval")
+  labs(y="number", x="package", title = "packages using eval")
   coord_flip()
 ggsave("packagesEval.pdf", plot = packagesPlot)
 

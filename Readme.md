@@ -4,8 +4,8 @@ This project aims at analyzing the usage of `eval`in the R language.
 
 - it analyzes `eval` in traces from execution of R packages, see *trace-eval-analysis.R*. Traces are consumed as [fst](https://www.fstpackage.org/) files. 
 - it can download a list of most downloaded packages from further analysis, see *download-packages.R*
-- it analyzes directly the source code of packages for `eval` usages
-- it can download a list of most popular packages on [www.cranstatic.org]()
+- it analyzes directly the source code of packages for `eval` usages, see *text-eval-analysis.R*
+- it can download a list of most popular packages on [www.cranstatic.org](), see *cranstatic.R*
 
 The scripts mostly generate graphs: histograms of most used `eval` calls, most used exprs in `eval`.
 

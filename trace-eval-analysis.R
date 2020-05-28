@@ -31,4 +31,4 @@ exprCaller <- callingFunctions %>% count(expression, last_caller) %>% filter(n >
     ggplot(aes(y = expression, x = last_caller)) + geom_tile(aes(fill=n)) + 
     scale_fill_viridis() +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
-ggsave(str_c(package_name, "_exprCaller.pdf"), plot = exprCaller)
+ggsave(str_c(package_name, "-exprCaller.pdf"), plot = exprCaller)
