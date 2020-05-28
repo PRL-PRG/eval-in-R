@@ -1,0 +1,4 @@
+*.pdf
+*.fst
+.DS_Store
+packages-*
