@@ -188,9 +188,9 @@ ggsave("propEvals.pdf", plot = mostUsedEvalCallPlot)
   
 
 
-extract_args <- function(ev_call) 
+extract_args_eval <- function(ev_call) 
 {
-  print(str_c("CALL:", ev_call, "\n"))
+  #print(str_c("CALL:", ev_call, "\n"))
   # Get an expression from the string
   exp <- parse(text = ev_call)[[1]]
   
@@ -223,6 +223,7 @@ extract_args <- function(ev_call)
   }
 }
 
+
 extract_call_name <- function(ev_call)
 {
   # Get an expression from the string
@@ -230,7 +231,8 @@ extract_call_name <- function(ev_call)
   # Check if it is actually a call
   if(is.call(exp))
   {
-    return(call_name(exp))
+    #return(call_name(exp)) # Would return NULL if the function is anonymous
+    return(deparse(exp[[1]]))
   }
   else
   {
@@ -243,7 +245,7 @@ extract_call_name <- function(ev_call)
 ev_results <- ev_results %>% filter(!package %in% c("AICcmodavg", "FactoClass", "ajv", "earth", "shinymaterial", "caret", "copula"))
 
 arg_eval <- ev_results %>% 
-  mutate(arguments = sapply(eval_call, extract_args), nb_args = sapply(arguments, length)) %>%
+  mutate(arguments = sapply(eval_call, extract_args_eval), nb_args = sapply(arguments, length)) %>%
   unnest_wider(arguments) # Unnest list of arguments into columns
 
 # How many use envir? and enclos?
@@ -278,6 +280,37 @@ ggsave("propCallExprEvals.pdf", plot = mostUsedEvalCallExprPlot)
 # Eval that use parse (and parse a string or a file)
 text_eval <- arg_eval %>% filter(str_detect(expr, fixed("parse")))
 
+extract_args_parse <- function(ev_call) 
+{
+  #print(str_c("CALL:", ev_call, "\n"))
+  exp <- parse(text = ev_call)[[1]]
+  
+  # Check if it is actually a call
+  if(is.call(exp) && exp[[1]] == "parse")
+  {
+    nb_args <- length(exp) - 1
+    # Have all the named arguments
+    # It requires to have the function in exp in the global environment
+    # sot it would require to add all the libraries we are
+    # parsing in the environment 
+    # for instance to be able to parse parse_only
+    if(nb_args > 0 && (!all(call_args_names(exp) %in% c("", "code", "text", "file", "n", "keep.source")) || exp[[2]] == "..." ))
+    {
+      print(str_c("Unknown args for ", ev_call))
+      return(list())
+    }
+    exp <- call_standardise(exp)
+    # List of arguments (remove the call name)
+    args <- call_args(exp)#as.list(exp[-1])
+    
+    return(map(args, function(x) {str_c(deparse(x), collapse = "\n")}))
+  }
+  else
+  {
+    return(list())
+  }
+}
+
 # Rename code arg of parse_only into text arg of parse
 sanitize_parse_args <- function(args) 
 {
@@ -286,11 +319,18 @@ sanitize_parse_args <- function(args)
     args$text <- args$code
     args$code <- NULL
   }
+  
+  if("file" %in% names(args))
+  {
+    args$fileParse <- args$file
+    args$file <- NULL
+  }
   return(args)
 }
 
 arg_text_eval <- arg_eval %>% filter(str_detect(expr, fixed("parse"))) %>% 
-  mutate(parse_arg = map(expr, ~ sanitize_parse_args(extract_args(.)))) %>% 
+  filter(str_detect(expr, fixed("deparse"), negate=TRUE)) %>%
+  mutate(parse_arg = map(expr, ~ sanitize_parse_args(extract_args_parse(.)))) %>% 
            unnest_wider(parse_arg)
 
 # How many use parameter keep.source?
