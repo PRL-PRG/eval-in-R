@@ -173,14 +173,17 @@ ev_results <- analyse_packages(packagedir)
 
 # Packages using eval
 packagesPlot <- ev_results %>% count(package) %>% filter(n > 1) %>% 
-    arrange(desc(n)) %>% ggplot() + geom_col(aes(x=fct_reorder(package, n), y=n))  + 
-  labs(y="number", x="package", title = "packages using eval")
-  coord_flip()
+    arrange(desc(n)) %>% head(50) %>%
+    ggplot() + geom_col(aes(x=fct_reorder(package, n), y=n))  + 
+    labs(y="number", x="package", title = "packages using eval") +
+    theme(axis.text.x=element_text(angle=60, hjust=1)) 
 ggsave("packagesEval.pdf", plot = packagesPlot)
 
 call_evals <- ev_results %>% count(eval_call) %>% arrange(desc(n))
 
-mostUsedEvalCallPlot <- call_evals %>% filter(n > 1) %>% mutate(prop = 100 * n / nrow(ev_results)) %>% ggplot() + 
+mostUsedEvalCallPlot <- call_evals %>% filter(n > 1) %>% 
+    mutate(prop = 100 * n / nrow(ev_results)) %>%  head(15) %>%
+    ggplot() + 
     geom_col(aes(x=fct_reorder(eval_call, prop), y=prop))  + 
     labs(y="%", x = "eval call", title = "Most used eval calls") + 
     coord_flip() 
@@ -260,7 +263,10 @@ arg_eval %>% count(enclos) %>% arrange(desc(n))
 # Most used exprs
 expr_evals <- arg_eval %>% count(expr) %>% arrange(desc(n))
 
-mostUsedEvalExprPlot <- expr_evals %>% filter(n > 1) %>% mutate(prop = 100 * n / nrow(arg_eval)) %>% ggplot() + 
+mostUsedEvalExprPlot <- expr_evals %>% filter(n > 1) %>%
+  mutate(prop = 100 * n / nrow(arg_eval)) %>% 
+  head(25) %>%
+  ggplot() + 
   geom_col(aes(x=fct_reorder(expr, prop), y=prop))  + 
   labs(y="%", x = "expression", title = "Most used expressions in eval calls") + 
   coord_flip() 
@@ -270,7 +276,9 @@ ggsave("propExprEvals.pdf", plot = mostUsedEvalExprPlot)
 call_expr_evals <- arg_eval %>% mutate(call_in_expr = map_chr(expr, extract_call_name)) %>%
     count(call_in_expr) %>% arrange(desc(n))
 
-mostUsedEvalCallExprPlot <- call_expr_evals  %>% mutate(prop = 100 * n / nrow(arg_eval)) %>% ggplot() + 
+mostUsedEvalCallExprPlot <- call_expr_evals  %>% 
+  mutate(prop = 100 * n / nrow(arg_eval)) %>% head(25) %>%
+  ggplot() + 
   geom_col(aes(x=fct_reorder(call_in_expr, prop), y=prop))  + 
   labs(y="%", x = "function", title = "Most used functions in exps eval calls",
        subtitle = "NA corresponds to a variable") + 
