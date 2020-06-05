@@ -103,69 +103,77 @@ remove_comments <- function(line)
   }
 }
 
-packagedir = "packages-2020-05-13"
+#packagedir = "packages-2020-05-13"
+packagedir = "packages-2020-06-03"
 
 # R source is in the R folder of the packages
 
-packages <- list.dirs("packages-2020-05-13",  recursive=FALSE)
-#packages <- sapply(packages, function(package) {paste0(package, "/R")})
-excluded_packages <- c("assertthat")
-
-packages <- packages[!str_detect(packages, str_c(excluded_packages, collapse="|"))]
-
-
-eval_results = list()
-
-for (package in packages)
+analyse_packages <- function(packagedir) 
 {
-  # Get all the R files
-  rFiles <- list.files(paste0(package, "/R"), full.names = TRUE, pattern = ".*\\.R")
+  packages <- list.dirs(packagedir,  recursive=FALSE)
+  #packages <- sapply(packages, function(package) {paste0(package, "/R")})
+  excluded_packages <- c("assertthat")
   
-  eval_package = list()
+  packages <- packages[!str_detect(packages, str_c(excluded_packages, collapse="|"))]
   
-  for (file in rFiles)
+  
+  eval_results = list()
+  
+  for (package in packages)
   {
-    # Read the file
-    filelines = readLines(file)
-    nbLines = length(filelines)
-    # Search for eval, line by line
-    # This is regex so we just detect the line
-    # To capture all the expression, we will need to do some balanced
-    # parenthesis matching
-    eval_lines <- tibble(lines = filelines) %>%
-      mutate(line_number = row_number()) %>%
-      mutate(lines_with_context = str_c(lag(lines), lines, lead(lines), sep="\n")) %>%
-      filter(str_detect(lines, fixed("eval"))) %>% # Coarse but quick
-      # Here, for performance reasons
-      mutate(lines = sapply(lines, remove_comments)) %>% # there could be evals only in the comments
-      filter(str_detect(lines, "eval\\s*\\("))  # filter  the remaining ones
-      #filter(str_detect(lines, fixed("eval("))) # 
+    # Get all the R files
+    rFiles <- list.files(paste0(package, "/R"), full.names = TRUE, pattern = ".*\\.R")
     
-    if(count(eval_lines) > 0)
+    eval_package = list()
+    
+    for (file in rFiles)
     {
-      eval_lines <- eval_lines %>% 
-        mutate(eval_call = sapply(line_number, function(ln) { parse_eval(filelines[ln:nbLines])}))
-      eval_package[[basename(file)]] <-  eval_lines
+      # Read the file
+      filelines = readLines(file)
+      nbLines = length(filelines)
+      # Search for eval, line by line
+      # This is regex so we just detect the line
+      # To capture all the expression, we will need to do some balanced
+      # parenthesis matching
+      eval_lines <- tibble(lines = filelines) %>%
+        mutate(line_number = row_number()) %>%
+        mutate(lines_with_context = str_c(lag(lines), lines, lead(lines), sep="\n")) %>%
+        filter(str_detect(lines, fixed("eval"))) %>% # Coarse but quick
+        # Here, for performance reasons
+        mutate(lines = sapply(lines, remove_comments)) %>% # there could be evals only in the comments
+        filter(str_detect(lines, "eval\\s*\\("))  # filter  the remaining ones
+      #filter(str_detect(lines, fixed("eval("))) # 
+      
+      if(count(eval_lines) > 0)
+      {
+        eval_lines <- eval_lines %>% 
+          mutate(eval_call = sapply(line_number, function(ln) { parse_eval(filelines[ln:nbLines])}))
+        eval_package[[basename(file)]] <-  eval_lines
+      }
+    }
+    if(length(eval_package) > 0) 
+    {
+      eval_results[[basename(package)]] <- bind_rows(eval_package, .id = "file")
     }
   }
-  if(length(eval_package) > 0) 
+  
+  ev_results <- if(length(eval_results) > 0)
   {
-    eval_results[[basename(package)]] <- bind_rows(eval_package, .id = "file")
+    bind_rows(eval_results, .id = "package")
+  } else 
+  {
+    print("Np packages using eval")
+    tibble()
   }
+  return(ev_results)
 }
 
-ev_results <- if(length(eval_results) > 0)
-{
-   bind_rows(eval_results, .id = "package")
-} else 
-{
-  print("Np packages using eval")
-  tibble()
-}
 
+ev_results <- analyse_packages(packagedir)
 
 # Packages using eval
-packagesPlot <- ev_results %>% count(package) %>% arrange(desc(n)) %>% ggplot() + geom_col(aes(x=fct_reorder(package, n), y=n))  + 
+packagesPlot <- ev_results %>% count(package) %>% filter(n > 1) %>% 
+    arrange(desc(n)) %>% ggplot() + geom_col(aes(x=fct_reorder(package, n), y=n))  + 
   labs(y="number", x="package", title = "packages using eval")
   coord_flip()
 ggsave("packagesEval.pdf", plot = packagesPlot)
@@ -182,9 +190,10 @@ ggsave("propEvals.pdf", plot = mostUsedEvalCallPlot)
 
 extract_args <- function(ev_call) 
 {
-  #print(str_c("CALL:", ev_call, "\n"))
+  print(str_c("CALL:", ev_call, "\n"))
   # Get an expression from the string
   exp <- parse(text = ev_call)[[1]]
+  
   # Check if it is actually a call and an eval call
   #if(is.call(exp) && exp[[1]] == "eval") #eval_call(exp, name="eval") with rlang
   if(is.call(exp))
@@ -192,7 +201,17 @@ extract_args <- function(ev_call)
     nb_args <- length(exp) - 1
     # Have all the named arguments
     # It requires to have the function in exp in the global environment
-    # that's why I added library(xfun) to be able to parse parse_only
+    # sot it would require to add all the libraries we are
+    # parsing in the environmen 
+    # for instance to be able to parse parse_only
+    # Is eval called with other arguments than the normal ones?
+    # Then filter it out.
+    # Also remove evals with ... because we cannot standardize them
+    if(nb_args > 0 && (!all(call_args_names(exp) %in% c("", "envir", "enclos")) || exp[[2]] == "..." || nb_args > 3))
+    {
+      print(str_c("Unknown args for ", ev_call))
+      return(list())
+    }
     exp <- call_standardise(exp)
     # List of arguments (remove the call name)
     args <- call_args(exp)#as.list(exp[-1])
@@ -218,6 +237,10 @@ extract_call_name <- function(ev_call)
     return(NA)
   }
 }
+
+# Filter out some packages that have problems because of \"
+# earth does a printf("eval(%s, %s))". We should also exclude in a string out of an eval
+ev_results <- ev_results %>% filter(!package %in% c("AICcmodavg", "FactoClass", "ajv", "earth", "shinymaterial", "caret", "copula"))
 
 arg_eval <- ev_results %>% 
   mutate(arguments = sapply(eval_call, extract_args), nb_args = sapply(arguments, length)) %>%
