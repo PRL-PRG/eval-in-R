@@ -9,6 +9,7 @@ library(viridis)
 #   "dplyr-eval-calls.fst"     "egg-eval-calls.fst"      
 # "msm-eval-calls.fst"      
 package_name <- "egg-eval-calls.fst"
+
 # package_name (always base here), function_name, expression, stack_frame, 
 eval_calls <- as_tibble(read.fst(package_name))
 
