@@ -102,4 +102,26 @@ constant_leaves <- function(eval_call)
   exp <- get_expr(eval_call)
   return(constant_leaves_expr(exp))
 }
+# Check if there is only one expression and that it is a call
+check_call <- function(arg)
+{
+  exp <- parse(text = arg)
+  return(length(exp) == 1 & is.call(exp[[1]]))
+}
 
+
+# Transforms a call in a character string in eval(parse(text = str)) into a do.call 
+text_call_to_do_call <- function(eval_call)
+{
+  exp <- get_expr(eval_call)
+  stopifnot(exp[[1]] == "eval")
+  args <- exp[-1]
+  stopifnot(is.call(args[[1]]) & args[[1]][[1]] == "parse")
+  text <- deparse(args[[1]]$text)
+  
+  # TODO: handle environment
+  
+  f_name <- function_name(text)
+  f_args <- function_arguments(text)
+  return(paste0("do.call(", f_name, ", list(", paste0(f_args, collapse = ","), "))"))
+}
